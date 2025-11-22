@@ -1,0 +1,12 @@
+USE url_saver;
+ALTER TABLE urls ADD COLUMN category VARCHAR(100) DEFAULT 'General';
+
+
+SHOW TABLES;
+DESCRIBE urls;
+CREATE TABLE urls (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255),
+  url TEXT,
+  tags VARCHAR(255)
+);

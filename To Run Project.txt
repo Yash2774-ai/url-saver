@@ -1,0 +1,4 @@
+(1)Open Backend Folder Terminal and Write in it :node server.js
+
+(2)Open Frontend Folder Terminal and Write in it :npm Start
+
