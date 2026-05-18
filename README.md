@@ -30,11 +30,11 @@ URL Saver is a full-stack web application designed to help users manage and save
 ## Installation
 
 1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd Url-Saver
-  2. Install dependencies for the backend:
-   cd backend
+```bash
+git clone <repository-url>
+cd Url-Saver
+2. Install dependencies for the backend:
+cd backend
 npm install
 3.Install dependencies for the frontend:
 cd ../frontend
