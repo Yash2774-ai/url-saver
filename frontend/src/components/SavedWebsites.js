@@ -13,6 +13,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import axios from "axios";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const SavedWebsites = () => {
   const [urls, setUrls] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState([]);
@@ -33,7 +35,7 @@ const SavedWebsites = () => {
   }, []);
 
   const fetchUrls = () => {
-    axios.get("http://localhost:5000/api/urls").then((res) => {
+    axios.get(`${API_URL}/api/urls`).then((res) => {
       setUrls(res.data);
     });
   };
@@ -60,7 +62,7 @@ const SavedWebsites = () => {
   // Delete URL with confirmation
   const handleDelete = (id) => {
     if (window.confirm("Are you sure you want to delete this website?")) {
-      axios.delete(`http://localhost:5000/api/urls/${id}`).then(() => {
+      axios.delete(`${API_URL}/api/urls/${id}`).then(() => {
         setUrls(urls.filter((u) => u.id !== id));
       });
     }
@@ -81,7 +83,7 @@ const SavedWebsites = () => {
 
   // Save edited URL
   const handleSaveEdit = (id) => {
-    axios.put(`http://localhost:5000/api/urls/${id}`, editForm).then(() => {
+    axios.put(`${API_URL}/api/urls/${id}`, editForm).then(() => {
       setUrls(urls.map((u) => (u.id === id ? { ...u, ...editForm, id } : u)));
       setEditingUrl(null);
     });

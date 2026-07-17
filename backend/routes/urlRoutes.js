@@ -4,7 +4,7 @@ const db = require("../db"); // your MySQL connection
 
 // GET all URLs
 router.get("/", (req, res) => {
-  const sql = "SELECT * FROM urls ORDER BY createdAt DESC";
+  const sql = "SELECT * FROM urls ORDER BY id DESC";
   db.query(sql, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
@@ -13,7 +13,7 @@ router.get("/", (req, res) => {
 
 // GET URLs by category (optional)
 router.get("/category/:category", (req, res) => {
-  const sql = "SELECT * FROM urls WHERE category = ? ORDER BY createdAt DESC";
+  const sql = "SELECT * FROM urls WHERE category = ? ORDER BY id DESC";
   db.query(sql, [req.params.category], (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);

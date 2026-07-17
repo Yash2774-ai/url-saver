@@ -3,6 +3,8 @@ import axios from "axios";
 import { TextField, Button, Grid, Typography, Paper, Box } from "@mui/material";
 import { Save } from "@mui/icons-material";
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 const UrlManager = () => {
   const [formData, setFormData] = useState({
     title: "",
@@ -13,7 +15,7 @@ const UrlManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post("http://localhost:5000/api/urls", formData);
+    await axios.post(`${API_URL}/api/urls`, formData);
     setFormData({ title: "", url: "", tags: "", notes: "" });
     alert("✅ Website saved successfully!");
   };
