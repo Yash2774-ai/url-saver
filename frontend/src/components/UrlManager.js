@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   TextField,
@@ -6,32 +6,44 @@ import {
   Grid,
   Typography,
   Paper,
-  MenuItem,
+  Autocomplete,
 } from "@mui/material";
 import { Save } from "@mui/icons-material";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const CATEGORY_OPTIONS = ["General", "Work", "Study", "AI", "Entertainment"];
+const DEFAULT_CATEGORIES = ["General", "Work", "Study", "AI", "Entertainment"];
 
 const UrlManager = () => {
+  const [urls, setUrls] = useState([]);
   const [formData, setFormData] = useState({
     title: "",
     url: "",
     description: "",
-    tags: "",
-    notes: "",
     category: "General",
   });
 
+  useEffect(() => {
+    axios.get(`${API_URL}/api/urls`).then((response) => {
+      setUrls(response.data);
+    });
+  }, []);
+
+  const categoryOptions = useMemo(() => {
+    const existingCategories = urls
+      .map((item) => (item.category || "").trim())
+      .filter(Boolean);
+
+    return Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories]));
+  }, [urls]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await axios.post(`${API_URL}/api/urls`, formData);
+    const response = await axios.post(`${API_URL}/api/urls`, formData);
+    setUrls((prev) => [response.data, ...prev]);
     setFormData({
       title: "",
       url: "",
       description: "",
-      tags: "",
-      notes: "",
       category: "General",
     });
     alert("Website saved successfully!");
@@ -76,42 +88,30 @@ const UrlManager = () => {
             />
           </Grid>
 
-          <Grid item xs={12} sm={6}>
-            <TextField
-              select
-              label="Category"
-              fullWidth
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-            >
-              {CATEGORY_OPTIONS.map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="Tags (comma separated)"
-              fullWidth
-              value={formData.tags}
-              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-            />
-          </Grid>
-
           <Grid item xs={12}>
-            <TextField
-              label="Notes"
-              fullWidth
-              multiline
-              rows={3}
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Add any notes or reminders..."
+            <Autocomplete
+              freeSolo
+              options={categoryOptions}
+              value={formData.category}
+              onInputChange={(_, value) =>
+                setFormData({ ...formData, category: value || "General" })
+              }
+              onChange={(_, value) =>
+                setFormData({
+                  ...formData,
+                  category:
+                    typeof value === "string"
+                      ? value
+                      : value?.label || value || "General",
+                })
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Category"
+                  helperText="Choose an existing category or type a new one"
+                />
+              )}
             />
           </Grid>
 

@@ -16,18 +16,32 @@ router.get("/stats", (req, res) => {
   const sql = `
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) AS favorites,
-      SUM(CASE WHEN category = 'General' THEN 1 ELSE 0 END) AS general_count,
-      SUM(CASE WHEN category = 'Work' THEN 1 ELSE 0 END) AS work_count,
-      SUM(CASE WHEN category = 'Study' THEN 1 ELSE 0 END) AS study_count,
-      SUM(CASE WHEN category = 'AI' THEN 1 ELSE 0 END) AS ai_count,
-      SUM(CASE WHEN category = 'Entertainment' THEN 1 ELSE 0 END) AS entertainment_count
+      SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END) AS favorites
     FROM urls
   `;
 
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results[0]);
+  const categorySql = `
+    SELECT category, COUNT(*) AS count
+    FROM urls
+    GROUP BY category
+    ORDER BY count DESC, category ASC
+  `;
+
+  db.query(sql, (summaryError, summaryResults) => {
+    if (summaryError) {
+      return res.status(500).json({ error: summaryError.message });
+    }
+
+    db.query(categorySql, (categoryError, categoryResults) => {
+      if (categoryError) {
+        return res.status(500).json({ error: categoryError.message });
+      }
+
+      res.json({
+        ...(summaryResults[0] || { total: 0, favorites: 0 }),
+        categories: categoryResults || [],
+      });
+    });
   });
 });
 
@@ -43,15 +57,7 @@ router.get("/category/:category", (req, res) => {
 
 // ADD a new URL
 router.post("/", (req, res) => {
-  const {
-    title,
-    url,
-    description,
-    tags,
-    notes,
-    category,
-    is_favorite,
-  } = req.body;
+  const { title, url, description, category, is_favorite } = req.body;
 
   const sql =
     "INSERT INTO urls (title, url, description, tags, notes, category, is_favorite) VALUES (?, ?, ?, ?, ?, ?, ?)";
@@ -62,8 +68,8 @@ router.post("/", (req, res) => {
       title,
       url,
       description || "",
-      tags || "",
-      notes || "",
+      "",
+      "",
       category || "General",
       is_favorite ? 1 : 0,
     ],
@@ -74,8 +80,6 @@ router.post("/", (req, res) => {
         title,
         url,
         description: description || "",
-        tags: tags || "",
-        notes: notes || "",
         category: category || "General",
         is_favorite: is_favorite ? 1 : 0,
       });
@@ -85,18 +89,10 @@ router.post("/", (req, res) => {
 
 // UPDATE a URL
 router.put("/:id", (req, res) => {
-  const {
-    title,
-    url,
-    description,
-    tags,
-    notes,
-    category,
-    is_favorite,
-  } = req.body;
+  const { title, url, description, category, is_favorite } = req.body;
 
   const sql =
-    "UPDATE urls SET title=?, url=?, description=?, tags=?, notes=?, category=?, is_favorite=? WHERE id=?";
+    "UPDATE urls SET title=?, url=?, description=?, category=?, is_favorite=? WHERE id=?";
 
   db.query(
     sql,
@@ -104,8 +100,6 @@ router.put("/:id", (req, res) => {
       title,
       url,
       description || "",
-      tags || "",
-      notes || "",
       category || "General",
       is_favorite ? 1 : 0,
       req.params.id,

@@ -11,9 +11,9 @@ import {
   TextField,
   Grid,
   InputAdornment,
-  MenuItem,
   Stack,
   Link,
+  Autocomplete,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -22,7 +22,7 @@ import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const CATEGORY_OPTIONS = ["All", "General", "Work", "Study", "AI", "Entertainment"];
+const DEFAULT_CATEGORIES = ["General", "Work", "Study", "AI", "Entertainment"];
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -33,11 +33,7 @@ const SORT_OPTIONS = [
 const emptyStats = {
   total: 0,
   favorites: 0,
-  general_count: 0,
-  work_count: 0,
-  study_count: 0,
-  ai_count: 0,
-  entertainment_count: 0,
+  categories: [],
 };
 
 const SavedWebsites = () => {
@@ -51,8 +47,6 @@ const SavedWebsites = () => {
     title: "",
     url: "",
     description: "",
-    tags: "",
-    notes: "",
     category: "General",
     is_favorite: 0,
   });
@@ -76,6 +70,14 @@ const SavedWebsites = () => {
     await Promise.all([fetchUrls(), fetchStats()]);
   };
 
+  const categoryOptions = useMemo(() => {
+    const fromUrls = urls
+      .map((item) => (item.category || "").trim())
+      .filter(Boolean);
+
+    return ["All", ...Array.from(new Set([...DEFAULT_CATEGORIES, ...fromUrls]))];
+  }, [urls]);
+
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this website?")) {
       return;
@@ -91,8 +93,6 @@ const SavedWebsites = () => {
       title: url.title || "",
       url: url.url || "",
       description: url.description || "",
-      tags: url.tags || "",
-      notes: url.notes || "",
       category: url.category || "General",
       is_favorite: url.is_favorite ? 1 : 0,
     });
@@ -126,13 +126,7 @@ const SavedWebsites = () => {
       const matchesCategory =
         selectedCategory === "All" || category === selectedCategory;
 
-      const haystack = [
-        url.title,
-        url.url,
-        url.tags,
-        url.notes,
-        url.category,
-      ]
+      const haystack = [url.title, url.url, url.description, url.category]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -165,11 +159,10 @@ const SavedWebsites = () => {
   const statCards = [
     { label: "Total Websites", value: stats.total },
     { label: "Favorite Websites", value: stats.favorites },
-    { label: "General", value: stats.general_count },
-    { label: "Work", value: stats.work_count },
-    { label: "Study", value: stats.study_count },
-    { label: "AI", value: stats.ai_count },
-    { label: "Entertainment", value: stats.entertainment_count },
+    ...stats.categories.map((item) => ({
+      label: item.category || "General",
+      value: item.count,
+    })),
   ];
 
   return (
@@ -198,13 +191,13 @@ const SavedWebsites = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={5}>
               <TextField
                 fullWidth
                 label="Search websites"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by title, URL, tags, notes, or category"
+                placeholder="Search by title, URL, description, or category"
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -215,7 +208,7 @@ const SavedWebsites = () => {
               />
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={4}>
               <TextField
                 select
                 fullWidth
@@ -224,16 +217,29 @@ const SavedWebsites = () => {
                 onChange={(e) => setSortBy(e.target.value)}
               >
                 {SORT_OPTIONS.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
+                  <option key={option.value} value={option.value}>
                     {option.label}
-                  </MenuItem>
+                  </option>
                 ))}
               </TextField>
             </Grid>
 
+            <Grid item xs={12} md={3}>
+              <Autocomplete
+                freeSolo
+                options={categoryOptions}
+                value={selectedCategory}
+                onInputChange={(_, value) => setSelectedCategory(value || "All")}
+                onChange={(_, value) => setSelectedCategory(value || "All")}
+                renderInput={(params) => (
+                  <TextField {...params} label="Filter category" />
+                )}
+              />
+            </Grid>
+
             <Grid item xs={12}>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {CATEGORY_OPTIONS.map((category) => (
+                {categoryOptions.map((category) => (
                   <Chip
                     key={category}
                     label={category}
@@ -297,28 +303,6 @@ const SavedWebsites = () => {
                   </Typography>
                 )}
 
-                {url.notes && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    <strong>Notes:</strong> {url.notes}
-                  </Typography>
-                )}
-
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  useFlexGap
-                  flexWrap="wrap"
-                  sx={{ mt: 2 }}
-                >
-                  {(url.tags || "")
-                    .split(",")
-                    .map((tag) => tag.trim())
-                    .filter(Boolean)
-                    .map((tag) => (
-                      <Chip key={`${url.id}-${tag}`} label={tag} size="small" />
-                    ))}
-                </Stack>
-
                 <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
                   <IconButton color="primary" onClick={() => handleEditClick(url)}>
                     <EditIcon />
@@ -357,44 +341,24 @@ const SavedWebsites = () => {
                       fullWidth
                       sx={{ mb: 1.5 }}
                     />
-                    <TextField
-                      label="Tags"
-                      value={editForm.tags}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, tags: e.target.value })
-                      }
-                      fullWidth
-                      sx={{ mb: 1.5 }}
-                    />
-                    <TextField
-                      label="Notes"
-                      value={editForm.notes}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, notes: e.target.value })
-                      }
-                      fullWidth
-                      multiline
-                      rows={3}
-                      sx={{ mb: 1.5 }}
-                    />
-                    <TextField
-                      select
-                      label="Category"
+                    <Autocomplete
+                      freeSolo
+                      options={categoryOptions.filter((category) => category !== "All")}
                       value={editForm.category}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, category: e.target.value })
+                      onInputChange={(_, value) =>
+                        setEditForm({ ...editForm, category: value || "General" })
                       }
-                      fullWidth
-                      sx={{ mb: 1.5 }}
-                    >
-                      {CATEGORY_OPTIONS.filter((category) => category !== "All").map(
-                        (category) => (
-                          <MenuItem key={category} value={category}>
-                            {category}
-                          </MenuItem>
-                        )
+                      onChange={(_, value) =>
+                        setEditForm({ ...editForm, category: value || "General" })
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Category"
+                          sx={{ mb: 1.5 }}
+                        />
                       )}
-                    </TextField>
+                    />
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <Button variant="contained" onClick={() => handleSaveEdit(url.id)}>
                         Save
