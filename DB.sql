@@ -7,8 +7,16 @@ CREATE TABLE IF NOT EXISTS urls (
   description TEXT,
   tags VARCHAR(255),
   notes TEXT,
-  category VARCHAR(100) DEFAULT 'General'
+  category VARCHAR(100) DEFAULT 'General',
+  is_favorite TINYINT(1) NOT NULL DEFAULT 0
 );
+
+ALTER TABLE urls
+ADD COLUMN IF NOT EXISTS is_favorite TINYINT(1) NOT NULL DEFAULT 0;
+
+UPDATE urls
+SET is_favorite = 0
+WHERE is_favorite IS NULL;
 
 SHOW TABLES;
 DESCRIBE urls;

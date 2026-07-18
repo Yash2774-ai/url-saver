@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import {
   Box,
   Typography,
@@ -8,17 +9,43 @@ import {
   Chip,
   Button,
   TextField,
+  Grid,
+  InputAdornment,
+  MenuItem,
+  Stack,
+  Link,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import axios from "axios";
+import SearchIcon from "@mui/icons-material/Search";
+import StarIcon from "@mui/icons-material/Star";
+import StarBorderIcon from "@mui/icons-material/StarBorder";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const CATEGORY_OPTIONS = ["All", "General", "Work", "Study", "AI", "Entertainment"];
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "az", label: "Alphabetical (A-Z)" },
+  { value: "za", label: "Alphabetical (Z-A)" },
+];
+
+const emptyStats = {
+  total: 0,
+  favorites: 0,
+  general_count: 0,
+  work_count: 0,
+  study_count: 0,
+  ai_count: 0,
+  entertainment_count: 0,
+};
 
 const SavedWebsites = () => {
   const [urls, setUrls] = useState([]);
-  const [expandedCategories, setExpandedCategories] = useState([]);
-  const [expandedUrls, setExpandedUrls] = useState([]);
+  const [stats, setStats] = useState(emptyStats);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
   const [editingUrl, setEditingUrl] = useState(null);
   const [editForm, setEditForm] = useState({
     title: "",
@@ -27,232 +54,372 @@ const SavedWebsites = () => {
     tags: "",
     notes: "",
     category: "General",
+    is_favorite: 0,
   });
 
-  // Fetch URLs
   useEffect(() => {
     fetchUrls();
+    fetchStats();
   }, []);
 
-  const fetchUrls = () => {
-    axios.get(`${API_URL}/api/urls`).then((res) => {
-      setUrls(res.data);
-    });
+  const fetchUrls = async () => {
+    const response = await axios.get(`${API_URL}/api/urls`);
+    setUrls(response.data);
   };
 
-  // Categories from URLs
-  const categories = Array.from(
-    new Set(urls.map((u) => u.category || "General"))
-  );
-
-  // Toggle category expand/collapse
-  const toggleCategory = (cat) => {
-    setExpandedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
+  const fetchStats = async () => {
+    const response = await axios.get(`${API_URL}/api/urls/stats`);
+    setStats({ ...emptyStats, ...response.data });
   };
 
-  // Toggle URL detail expand/collapse
-  const toggleUrlDetail = (id) => {
-    setExpandedUrls((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
+  const refreshData = async () => {
+    await Promise.all([fetchUrls(), fetchStats()]);
   };
 
-  // Delete URL with confirmation
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this website?")) {
-      axios.delete(`${API_URL}/api/urls/${id}`).then(() => {
-        setUrls(urls.filter((u) => u.id !== id));
-      });
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this website?")) {
+      return;
     }
+
+    await axios.delete(`${API_URL}/api/urls/${id}`);
+    await refreshData();
   };
 
-  // Edit click
   const handleEditClick = (url) => {
     setEditingUrl(url.id);
     setEditForm({
-      title: url.title,
-      url: url.url,
-      description: url.description,
-      tags: url.tags,
-      notes: url.notes,
+      title: url.title || "",
+      url: url.url || "",
+      description: url.description || "",
+      tags: url.tags || "",
+      notes: url.notes || "",
       category: url.category || "General",
+      is_favorite: url.is_favorite ? 1 : 0,
     });
   };
 
-  // Save edited URL
-  const handleSaveEdit = (id) => {
-    axios.put(`${API_URL}/api/urls/${id}`, editForm).then(() => {
-      setUrls(urls.map((u) => (u.id === id ? { ...u, ...editForm, id } : u)));
-      setEditingUrl(null);
-    });
+  const handleSaveEdit = async (id) => {
+    await axios.put(`${API_URL}/api/urls/${id}`, editForm);
+    setEditingUrl(null);
+    await refreshData();
   };
+
+  const handleToggleFavorite = async (url) => {
+    const nextFavorite = url.is_favorite ? 0 : 1;
+    await axios.patch(`${API_URL}/api/urls/${url.id}/favorite`, {
+      is_favorite: nextFavorite,
+    });
+
+    setUrls((prev) =>
+      prev.map((item) =>
+        item.id === url.id ? { ...item, is_favorite: nextFavorite } : item
+      )
+    );
+    await fetchStats();
+  };
+
+  const filteredUrls = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const results = urls.filter((url) => {
+      const category = url.category || "General";
+      const matchesCategory =
+        selectedCategory === "All" || category === selectedCategory;
+
+      const haystack = [
+        url.title,
+        url.url,
+        url.tags,
+        url.notes,
+        url.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch =
+        normalizedSearch.length === 0 || haystack.includes(normalizedSearch);
+
+      return matchesCategory && matchesSearch;
+    });
+
+    return results.sort((a, b) => {
+      if ((b.is_favorite ? 1 : 0) !== (a.is_favorite ? 1 : 0)) {
+        return (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0);
+      }
+
+      switch (sortBy) {
+        case "oldest":
+          return a.id - b.id;
+        case "az":
+          return (a.title || "").localeCompare(b.title || "");
+        case "za":
+          return (b.title || "").localeCompare(a.title || "");
+        case "newest":
+        default:
+          return b.id - a.id;
+      }
+    });
+  }, [searchTerm, selectedCategory, sortBy, urls]);
+
+  const statCards = [
+    { label: "Total Websites", value: stats.total },
+    { label: "Favorite Websites", value: stats.favorites },
+    { label: "General", value: stats.general_count },
+    { label: "Work", value: stats.work_count },
+    { label: "Study", value: stats.study_count },
+    { label: "AI", value: stats.ai_count },
+    { label: "Entertainment", value: stats.entertainment_count },
+  ];
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
       <Typography variant="h5" gutterBottom>
         Saved Websites
       </Typography>
 
-      {/* Render categories */}
-      {categories.map((cat) => {
-        const urlsInCat = urls.filter((u) => (u.category || "General") === cat);
-        const isExpanded = expandedCategories.includes(cat);
-
-        return (
-          <Box key={cat} sx={{ mb: 2 }}>
-            {/* Category header */}
-            <Card
-              sx={{
-                cursor: "pointer",
-                backgroundColor: "#f0f0f0",
-                mb: 1,
-              }}
-              onClick={() => toggleCategory(cat)}
-            >
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {statCards.map((card) => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={card.label}>
+            <Card sx={{ height: "100%" }}>
               <CardContent>
-                <Typography variant="h6">
-                  {isExpanded ? "▼" : "►"} {cat} ({urlsInCat.length})
+                <Typography color="text.secondary" variant="body2" gutterBottom>
+                  {card.label}
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {card.value || 0}
                 </Typography>
               </CardContent>
             </Card>
+          </Grid>
+        ))}
+      </Grid>
 
-            {/* URLs under category */}
-            {isExpanded &&
-              urlsInCat.map((url) => {
-                const isUrlExpanded = expandedUrls.includes(url.id);
-                return (
-                  <Card
-                    key={url.id}
-                    sx={{
-                      mb: 1,
-                      ml: 2,
-                      borderLeft: "5px solid #1976d2",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => toggleUrlDetail(url.id)}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Search websites"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by title, URL, tags, notes, or category"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                fullWidth
+                label="Sort by"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {CATEGORY_OPTIONS.map((category) => (
+                  <Chip
+                    key={category}
+                    label={category}
+                    color={selectedCategory === category ? "primary" : "default"}
+                    variant={selectedCategory === category ? "filled" : "outlined"}
+                    onClick={() => setSelectedCategory(category)}
+                  />
+                ))}
+              </Stack>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Grid container spacing={2}>
+        {filteredUrls.map((url) => (
+          <Grid item xs={12} md={6} key={url.id}>
+            <Card
+              sx={{
+                height: "100%",
+                borderLeft: `5px solid ${url.is_favorite ? "#fbc02d" : "#1976d2"}`,
+              }}
+            >
+              <CardContent>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    justifyContent: "space-between",
+                    gap: 1,
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="h6">{url.title}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      {url.category || "General"}
+                    </Typography>
+                  </Box>
+
+                  <IconButton
+                    color={url.is_favorite ? "warning" : "default"}
+                    onClick={() => handleToggleFavorite(url)}
+                    aria-label="toggle favorite"
                   >
-                    <CardContent>
-                      <Typography variant="subtitle1">{url.title}</Typography>
-                      {isUrlExpanded && (
-                        <Box sx={{ mt: 1 }}>
-                          <Typography variant="body2" color="primary">
-                            <a href={url.url} target="_blank" rel="noopener noreferrer">
-                              {url.url}
-                            </a>
-                          </Typography>
-                          <Typography variant="body2">{url.description}</Typography>
-                          {url.notes && (
-                            <Typography variant="body2" color="textSecondary">
-                              <strong>Notes:</strong> {url.notes}
-                            </Typography>
-                          )}
-                          <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
-                            {url.tags &&
-                              url.tags.split(",").map((tag, i) => (
-                                <Chip key={i} label={tag.trim()} />
-                              ))}
-                          </Box>
-                          <Box sx={{ mt: 1 }}>
-                            <IconButton
-                              color="error"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDelete(url.id);
-                              }}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                            <IconButton
-                              color="primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditClick(url);
-                              }}
-                            >
-                              <EditIcon />
-                            </IconButton>
-                          </Box>
+                    {url.is_favorite ? <StarIcon /> : <StarBorderIcon />}
+                  </IconButton>
+                </Box>
 
-                          {/* Edit Form */}
-                          {editingUrl === url.id && (
-                            <Box sx={{ mt: 2 }}>
-                              <TextField
-                                label="Title"
-                                value={editForm.title}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, title: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <TextField
-                                label="URL"
-                                value={editForm.url}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, url: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <TextField
-                                label="Description"
-                                value={editForm.description}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, description: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <TextField
-                                label="Tags"
-                                value={editForm.tags}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, tags: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <TextField
-                                label="Notes"
-                                value={editForm.notes}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, notes: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <TextField
-                                label="Category"
-                                value={editForm.category}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, category: e.target.value })
-                                }
-                                fullWidth
-                                sx={{ mb: 1 }}
-                              />
-                              <Button
-                                variant="contained"
-                                onClick={() => handleSaveEdit(url.id)}
-                                sx={{ mr: 1 }}
-                              >
-                                Save
-                              </Button>
-                              <Button variant="outlined" onClick={() => setEditingUrl(null)}>
-                                Cancel
-                              </Button>
-                            </Box>
-                          )}
-                        </Box>
+                <Link
+                  href={url.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                >
+                  {url.url}
+                </Link>
+
+                {url.description && (
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    {url.description}
+                  </Typography>
+                )}
+
+                {url.notes && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    <strong>Notes:</strong> {url.notes}
+                  </Typography>
+                )}
+
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  flexWrap="wrap"
+                  sx={{ mt: 2 }}
+                >
+                  {(url.tags || "")
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean)
+                    .map((tag) => (
+                      <Chip key={`${url.id}-${tag}`} label={tag} size="small" />
+                    ))}
+                </Stack>
+
+                <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                  <IconButton color="primary" onClick={() => handleEditClick(url)}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton color="error" onClick={() => handleDelete(url.id)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+
+                {editingUrl === url.id && (
+                  <Box sx={{ mt: 2 }}>
+                    <TextField
+                      label="Title"
+                      value={editForm.title}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, title: e.target.value })
+                      }
+                      fullWidth
+                      sx={{ mb: 1.5 }}
+                    />
+                    <TextField
+                      label="URL"
+                      value={editForm.url}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, url: e.target.value })
+                      }
+                      fullWidth
+                      sx={{ mb: 1.5 }}
+                    />
+                    <TextField
+                      label="Description"
+                      value={editForm.description}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, description: e.target.value })
+                      }
+                      fullWidth
+                      sx={{ mb: 1.5 }}
+                    />
+                    <TextField
+                      label="Tags"
+                      value={editForm.tags}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, tags: e.target.value })
+                      }
+                      fullWidth
+                      sx={{ mb: 1.5 }}
+                    />
+                    <TextField
+                      label="Notes"
+                      value={editForm.notes}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, notes: e.target.value })
+                      }
+                      fullWidth
+                      multiline
+                      rows={3}
+                      sx={{ mb: 1.5 }}
+                    />
+                    <TextField
+                      select
+                      label="Category"
+                      value={editForm.category}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, category: e.target.value })
+                      }
+                      fullWidth
+                      sx={{ mb: 1.5 }}
+                    >
+                      {CATEGORY_OPTIONS.filter((category) => category !== "All").map(
+                        (category) => (
+                          <MenuItem key={category} value={category}>
+                            {category}
+                          </MenuItem>
+                        )
                       )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-          </Box>
-        );
-      })}
+                    </TextField>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <Button variant="contained" onClick={() => handleSaveEdit(url.id)}>
+                        Save
+                      </Button>
+                      <Button variant="outlined" onClick={() => setEditingUrl(null)}>
+                        Cancel
+                      </Button>
+                    </Box>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+
+      {filteredUrls.length === 0 && (
+        <Card sx={{ mt: 2 }}>
+          <CardContent>
+            <Typography color="text.secondary">
+              No websites match the current search or filter.
+            </Typography>
+          </CardContent>
+        </Card>
+      )}
     </Box>
   );
 };
