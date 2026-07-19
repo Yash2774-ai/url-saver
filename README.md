@@ -1,61 +1,125 @@
 # URL Saver
 
-URL Saver is a full-stack web application designed to help users manage and save their favorite URLs efficiently. The project is built using a React-based frontend and an Express.js backend, with MySQL as the database.
+URL Saver is a full-stack web application for storing, organizing, and quickly accessing saved websites. The application uses a React frontend for the user interface and an Express.js backend with MySQL for data persistence.
 
 ## Features
 
-- Save and manage URLs with ease.
-- View a list of saved URLs.
-- Responsive and user-friendly interface.
-- Backend API for managing URL data.
+- Save website links with title, description, and category
+- View saved websites in a categorized list
+- Mark websites as favorites
+- Browse saved entries from the frontend dashboard
+- REST API for adding, listing, updating, and deleting URLs
 
 ## Tech Stack
 
 ### Frontend
-- **React**: A JavaScript library for building user interfaces.
-- **Material-UI**: A popular React UI framework for styling.
-- **Axios**: For making HTTP requests.
+- React 19
+- Material UI
+- Axios
+- React Scripts
 
 ### Backend
-- **Express.js**: A web application framework for Node.js.
-- **MySQL**: A relational database for storing URL data.
-- **Body-Parser**: Middleware for parsing incoming request bodies.
-- **CORS**: Middleware for enabling Cross-Origin Resource Sharing.
+- Node.js
+- Express.js 5
+- MySQL2
+- CORS
+- Body Parser
 
 ## Prerequisites
 
-- **Node.js**: Ensure you have Node.js installed on your system.
-- **MySQL**: Set up a MySQL database.
+Before running the project, make sure you have:
 
-## Installation
+- Node.js installed
+- MySQL installed and running
+- A MySQL database named `url_saver` or update the configuration in `backend/db.js`
 
-1. Clone the repository:
+## Project Setup
+
+### 1. Clone the repository
+
 ```bash
 git clone <repository-url>
-cd Url-Saver
-2. Install dependencies for the backend:
+cd "Url Saver"
+```
+
+### 2. Install backend dependencies
+
+```bash
 cd backend
 npm install
-3.Install dependencies for the frontend:
+```
+
+### 3. Install frontend dependencies
+
+```bash
 cd ../frontend
 npm install
-4.Set up the database:
+```
 
-Import the DB.sql file into your MySQL database.
-Update the database connection details in backend/db.js.
-Usage
-Running the Backend
-1.Navigate to the backend directory
+### 4. Configure the database
+
+1. Open MySQL and create the database if needed.
+2. Import the SQL schema from `DB.sql`.
+3. Update database credentials in `backend/db.js` if your local MySQL settings differ.
+
+Default configuration uses:
+
+- Host: `localhost`
+- Port: `3306`
+- User: `root`
+- Password: `SQLPassword`
+- Database: `url_saver`
+
+You can override these values with environment variables:
+
+```bash
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=SQLPassword
+DB_NAME=url_saver
+```
+
+## Running the Application
+
+### Start the backend
+
+```bash
 cd backend
-2.Start the server:
-node server.js
-Running the Frontend
-1.Navigate to the frontend directory:
-cd frontend
-2.tart the development server:
 npm start
-Project Structure
-Url-Saver/
+```
+
+The backend runs on:
+
+- `http://localhost:5000`
+
+### Start the frontend
+
+```bash
+cd frontend
+npm start
+```
+
+The frontend development server runs on:
+
+- `http://localhost:3000`
+
+## API Endpoints
+
+The backend exposes the following routes under `/api/urls`:
+
+- `GET /api/urls` — Fetch all saved URLs
+- `GET /api/urls/stats` — Fetch total and favorite counts plus category breakdown
+- `GET /api/urls/category/:category` — Fetch URLs by category
+- `POST /api/urls` — Add a new URL
+- `PUT /api/urls/:id` — Update a URL
+- `PATCH /api/urls/:id/favorite` — Toggle a favorite flag
+- `DELETE /api/urls/:id` — Delete a URL
+
+## Project Structure
+
+```text
+Url Saver/
 ├── backend/
 │   ├── db.js
 │   ├── package.json
@@ -65,30 +129,22 @@ Url-Saver/
 ├── frontend/
 │   ├── package.json
 │   ├── public/
-│   │   ├── index.html
-│   │   ├── manifest.json
-│   │   └── robots.txt
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── SavedWebsites.js
-│   │   │   └── UrlManager.js
-│   │   ├── App.js
-│   │   ├── index.js
-│   │   └── ...
+│   └── src/
 ├── DB.sql
-└── To Run Project.txt
-Scripts
-Backend
-npm start: Start the backend server.
-Frontend
-npm start: Start the development server.
-npm run build: Build the frontend for production.
-npm test: Run tests.
-License
+└── README.md
+```
+
+## Available Scripts
+
+### Backend
+- `npm start` — Start the Express server
+
+### Frontend
+- `npm start` — Start the development server
+- `npm run build` — Build the production bundle
+- `npm test` — Run frontend tests
+
+## License
+
 This project is licensed under the ISC License.
 
-Acknowledgments
-React
-Material-UI
-Express.js
-MySQL
